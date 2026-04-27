@@ -165,7 +165,7 @@ export default function App() {
       <header className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center border-b-4 border-amber-500 shrink-0 relative z-20">
         <div className="flex-1">
           <h1 className="text-xl font-bold tracking-tight uppercase flex items-center gap-2">
-            <Factory className="text-amber-500 w-6 h-6" /> Genesis Energy Corp
+            <Factory className="text-amber-500 w-6 h-6" /> EPROM
           </h1>
           <p className="text-xs text-slate-400 font-mono mt-0.5">Strategic Project Reporting Portal</p>
         </div>
