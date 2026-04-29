@@ -35,6 +35,13 @@ interface Achievement {
   impact: string;
 }
 
+interface TargetObjective {
+  id: string;
+  description: string;
+  completed: boolean;
+  percentage: number;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState(1);
   const totalTabs = 4;
@@ -57,11 +64,18 @@ export default function App() {
       actual: '',
       forecast: '',
     },
-    targets: '',
     qBottlenecks: '',
     qResourceAllocation: '',
     qEmergingRisks: '',
+    generalComments: '',
   });
+
+  const [targetObjectives, setTargetObjectives] = useState<TargetObjective[]>([
+    { id: '1', description: 'Complete Phase II Engineering Design', completed: false, percentage: 0 },
+    { id: '2', description: 'Secure All Environmental Permits', completed: false, percentage: 0 },
+    { id: '3', description: 'Procure Long Lead Equipment (Compressors)', completed: false, percentage: 0 },
+    { id: '4', description: 'Achieve 250,000 Safe Man-hours', completed: false, percentage: 0 },
+  ]);
 
   const [achievements, setAchievements] = useState<Achievement[]>([
     { id: '1', description: '', date: '', impact: '' }
@@ -75,6 +89,22 @@ export default function App() {
 
   const [photos, setPhotos] = useState<{ name: string; url: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateField = (name: string, value: string) => {
+    let error = '';
+    if (name === 'projectName' && !value.trim()) error = 'Required field';
+    if (name === 'projectManager' && !value.trim()) error = 'Required field';
+    if (name === 'facilityLocation' && !value.trim()) error = 'Required field';
+    
+    if (name.startsWith('financials.')) {
+      if (!value.trim()) error = 'Required field';
+      else if (isNaN(Number(value.replace(/,/g, '')))) error = 'Must be numbers only';
+    }
+    
+    setErrors(prev => ({ ...prev, [name]: error }));
+    return error === '';
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -90,6 +120,15 @@ export default function App() {
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+    // Clear error on type to avoid annoyance, validate on blur
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    validateField(name, value);
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,9 +172,29 @@ export default function App() {
     }
   };
 
+  const updateTargetObjective = (id: string, field: keyof TargetObjective, value: any) => {
+    setTargetObjectives(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
+  };
+
+  const validateAll = () => {
+    let isValid = true;
+    isValid = validateField('projectName', formData.projectName) && isValid;
+    isValid = validateField('projectManager', formData.projectManager) && isValid;
+    isValid = validateField('facilityLocation', formData.facilityLocation) && isValid;
+    isValid = validateField('financials.budget', formData.financials.budget) && isValid;
+    isValid = validateField('financials.actual', formData.financials.actual) && isValid;
+    isValid = validateField('financials.forecast', formData.financials.forecast) && isValid;
+    return isValid;
+  };
+
   const exportData = () => {
+    if (!validateAll()) {
+      alert("Please fix the validation errors before saving.");
+      return;
+    }
     const dataToExport = {
       ...formData,
+      targetObjectives,
       achievements,
       tasks,
       timestamp: new Date().toISOString()
@@ -235,10 +294,12 @@ export default function App() {
                       name="projectName"
                       value={formData.projectName}
                       onChange={handleInputChange}
+                      onBlur={handleBlur}
                       placeholder="e.g. CDU Debottlenecking Phase II"
-                      className="w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white transition-colors"
+                      className={`w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border ${errors.projectName ? 'border-red-500 focus:ring-red-500 block' : 'border-slate-300 focus:ring-slate-900'} focus:outline-none focus:ring-1 focus:bg-white transition-colors`}
                     />
                   </div>
+                  {errors.projectName && <p className="text-red-500 text-[10px] mt-1 uppercase font-bold">{errors.projectName}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Project Manager</label>
@@ -249,9 +310,11 @@ export default function App() {
                       name="projectManager"
                       value={formData.projectManager}
                       onChange={handleInputChange}
-                      className="w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white transition-colors"
+                      onBlur={handleBlur}
+                      className={`w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border ${errors.projectManager ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 focus:ring-slate-900'} focus:outline-none focus:ring-1 focus:bg-white transition-colors`}
                     />
                   </div>
+                  {errors.projectManager && <p className="text-red-500 text-[10px] mt-1 uppercase font-bold">{errors.projectManager}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Facility / Site Location</label>
@@ -262,10 +325,12 @@ export default function App() {
                       name="facilityLocation"
                       value={formData.facilityLocation}
                       onChange={handleInputChange}
+                      onBlur={handleBlur}
                       placeholder="e.g. Houston Refinery Sector 4"
-                      className="w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white transition-colors"
+                      className={`w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border ${errors.facilityLocation ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 focus:ring-slate-900'} focus:outline-none focus:ring-1 focus:bg-white transition-colors`}
                     />
                   </div>
+                  {errors.facilityLocation && <p className="text-red-500 text-[10px] mt-1 uppercase font-bold">{errors.facilityLocation}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Reporting Period</label>
@@ -371,16 +436,36 @@ export default function App() {
                  </h2>
               </div>
               <div className="p-6 space-y-8">
-                <div className="space-y-2 lg:w-3/4">
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Quarter/Annual Target Objectives</label>
-                  <textarea
-                    name="targets"
-                    value={formData.targets}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full border p-3 text-sm bg-slate-50 border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white transition-colors resize-y leading-relaxed"
-                    placeholder="Define the primary targets expected to be hit during this period..."
-                  />
+                <div className="space-y-4 lg:w-3/4">
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b pb-2">Predefined Quarter/Annual Target Objectives</label>
+                  <div className="space-y-3">
+                    {targetObjectives.map(target => (
+                      <div key={target.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50 border border-slate-200 p-3 shadow-sm hover:bg-white transition-colors gap-3">
+                        <div className="flex items-center gap-3">
+                          <input 
+                            type="checkbox" 
+                            checked={target.completed}
+                            onChange={(e) => updateTargetObjective(target.id, 'completed', e.target.checked)}
+                            className="w-5 h-5 accent-emerald-500 rounded border-slate-300 cursor-pointer"
+                          />
+                          <span className={`text-sm ${target.completed ? 'text-slate-400 line-through' : 'text-slate-800 font-medium'}`}>{target.description}</span>
+                        </div>
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <span className="text-[10px] uppercase font-bold text-slate-500">Completion</span>
+                          <div className="flex items-center bg-white border border-slate-300 px-2 py-1 focus-within:ring-1 focus-within:ring-slate-900 focus-within:border-slate-900 transition-colors">
+                             <input 
+                               type="number" 
+                               min="0" max="100"
+                               value={target.percentage}
+                               onChange={(e) => updateTargetObjective(target.id, 'percentage', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                               className="w-12 text-right bg-transparent text-sm font-mono focus:outline-none text-slate-800"
+                             />
+                             <span className="text-sm font-mono text-slate-400 ml-1">%</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -486,29 +571,32 @@ export default function App() {
                  </h2>
               </div>
               <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-6">
-                 <div className="space-y-1 bg-slate-50 p-4 border border-slate-200 flex flex-col justify-center relative overflow-hidden">
+                 <div className={`space-y-1 bg-slate-50 p-4 border flex flex-col justify-center relative overflow-hidden ${errors['financials.budget'] ? 'border-red-500' : 'border-slate-200'}`}>
                     <div className="absolute -right-4 -bottom-4 opacity-5"><DollarSign className="w-24 h-24" /></div>
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest relative z-10">Allocated Budget</label>
                     <div className="relative mt-2 z-10 flex items-center">
                       <span className="text-slate-400 font-bold mr-2 text-lg">$</span>
-                      <input type="text" name="financials.budget" value={formData.financials.budget} onChange={handleInputChange} className="w-full bg-transparent border-b-2 border-slate-300 focus:border-slate-900 focus:outline-none font-mono text-xl text-slate-800 transition-colors p-1" placeholder="10,000,000" />
+                      <input type="text" name="financials.budget" value={formData.financials.budget} onChange={handleInputChange} onBlur={handleBlur} className={`w-full bg-transparent border-b-2 ${errors['financials.budget'] ? 'border-red-500 text-red-600' : 'border-slate-300 focus:border-slate-900 text-slate-800'} focus:outline-none font-mono text-xl transition-colors p-1`} placeholder="10,000,000" />
                     </div>
+                    {errors['financials.budget'] && <p className="text-red-500 text-[10px] mt-1 uppercase font-bold relative z-10">{errors['financials.budget']}</p>}
                  </div>
-                 <div className="space-y-1 bg-slate-50 p-4 border border-slate-200 flex flex-col justify-center relative overflow-hidden">
+                 <div className={`space-y-1 bg-slate-50 p-4 border flex flex-col justify-center relative overflow-hidden ${errors['financials.actual'] ? 'border-red-500' : 'border-slate-200'}`}>
                     <div className="absolute -right-4 -bottom-4 opacity-5"><Activity className="w-24 h-24" /></div>
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest relative z-10">Actual Spend</label>
                     <div className="relative mt-2 z-10 flex items-center">
                       <span className="text-amber-500 font-bold mr-2 text-lg">$</span>
-                      <input type="text" name="financials.actual" value={formData.financials.actual} onChange={handleInputChange} className="w-full bg-transparent border-b-2 border-slate-300 focus:border-amber-500 focus:outline-none font-mono text-xl text-amber-700 transition-colors p-1" placeholder="4,500,000" />
+                      <input type="text" name="financials.actual" value={formData.financials.actual} onChange={handleInputChange} onBlur={handleBlur} className={`w-full bg-transparent border-b-2 ${errors['financials.actual'] ? 'border-red-500 text-red-600' : 'border-slate-300 focus:border-amber-500 text-amber-700'} focus:outline-none font-mono text-xl transition-colors p-1`} placeholder="4,500,000" />
                     </div>
+                    {errors['financials.actual'] && <p className="text-red-500 text-[10px] mt-1 uppercase font-bold relative z-10">{errors['financials.actual']}</p>}
                  </div>
-                 <div className="space-y-1 bg-slate-50 p-4 border border-slate-200 flex flex-col justify-center relative overflow-hidden">
+                 <div className={`space-y-1 bg-slate-50 p-4 border flex flex-col justify-center relative overflow-hidden ${errors['financials.forecast'] ? 'border-red-500' : 'border-slate-200'}`}>
                     <div className="absolute -right-4 -bottom-4 opacity-5"><TrendingUp className="w-24 h-24" /></div>
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest relative z-10">Forecast at Completion</label>
                     <div className="relative mt-2 z-10 flex items-center">
                       <span className="text-slate-400 font-bold mr-2 text-lg">$</span>
-                      <input type="text" name="financials.forecast" value={formData.financials.forecast} onChange={handleInputChange} className="w-full bg-transparent border-b-2 border-slate-300 focus:border-slate-900 focus:outline-none font-mono text-xl text-slate-800 transition-colors p-1" placeholder="10,250,000" />
+                      <input type="text" name="financials.forecast" value={formData.financials.forecast} onChange={handleInputChange} onBlur={handleBlur} className={`w-full bg-transparent border-b-2 ${errors['financials.forecast'] ? 'border-red-500 text-red-600' : 'border-slate-300 focus:border-slate-900 text-slate-800'} focus:outline-none font-mono text-xl transition-colors p-1`} placeholder="10,250,000" />
                     </div>
+                    {errors['financials.forecast'] && <p className="text-red-500 text-[10px] mt-1 uppercase font-bold relative z-10">{errors['financials.forecast']}</p>}
                  </div>
               </div>
             </div>
@@ -618,6 +706,26 @@ export default function App() {
               </div>
             </div>
               
+            {/* Section 9: Additional Notes & Remarks */}
+            <div className="bg-white border border-slate-200 shadow-sm relative overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
+                 <h2 className="text-sm font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                   <FileText className="w-4 h-4 text-slate-400" />
+                   9. Additional Notes & Remarks
+                 </h2>
+              </div>
+              <div className="p-6">
+                <textarea
+                  name="generalComments"
+                  value={formData.generalComments}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full border p-4 text-sm bg-white border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-900 transition-colors resize-y leading-relaxed placeholder:text-slate-400"
+                  placeholder="Enter any other general comments, constraints, dependencies or notes relevant to this report..."
+                />
+              </div>
+            </div>
+
             {/* Action Bar (Only visible on last tab or print hidden) */}
             <div className="bg-slate-100 p-6 flex flex-col sm:flex-row gap-4 justify-end border-t border-slate-300 print:hidden mt-8 shadow-inner">
               <button 
