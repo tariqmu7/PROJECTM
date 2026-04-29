@@ -40,6 +40,9 @@ interface TargetObjective {
   description: string;
   completed: boolean;
   percentage: number;
+  startDate?: string;
+  endDate?: string;
+  duration?: string;
 }
 
 export default function App() {
@@ -64,17 +67,18 @@ export default function App() {
       actual: '',
       forecast: '',
     },
-    qBottlenecks: '',
-    qResourceAllocation: '',
-    qEmergingRisks: '',
+    qBottlenecks: [''],
+    qResourceAllocation: [''],
+    qEmergingRisks: [''],
     generalComments: '',
   });
 
+  const [newObjectiveText, setNewObjectiveText] = useState('');
   const [targetObjectives, setTargetObjectives] = useState<TargetObjective[]>([
-    { id: '1', description: 'Complete Phase II Engineering Design', completed: false, percentage: 0 },
-    { id: '2', description: 'Secure All Environmental Permits', completed: false, percentage: 0 },
-    { id: '3', description: 'Procure Long Lead Equipment (Compressors)', completed: false, percentage: 0 },
-    { id: '4', description: 'Achieve 250,000 Safe Man-hours', completed: false, percentage: 0 },
+    { id: '1', description: 'Complete Phase II Engineering Design', completed: false, percentage: 0, startDate: '', endDate: '', duration: '' },
+    { id: '2', description: 'Secure All Environmental Permits', completed: false, percentage: 0, startDate: '', endDate: '', duration: '' },
+    { id: '3', description: 'Procure Long Lead Equipment (Compressors)', completed: false, percentage: 0, startDate: '', endDate: '', duration: '' },
+    { id: '4', description: 'Achieve 250,000 Safe Man-hours', completed: false, percentage: 0, startDate: '', endDate: '', duration: '' },
   ]);
 
   const [achievements, setAchievements] = useState<Achievement[]>([
@@ -131,10 +135,49 @@ export default function App() {
     validateField(name, value);
   };
 
+  const handleArrayInputChange = (field: 'qBottlenecks' | 'qResourceAllocation' | 'qEmergingRisks', index: number, value: string) => {
+    setFormData(prev => {
+      const newArray = [...prev[field]];
+      newArray[index] = value;
+      return { ...prev, [field]: newArray };
+    });
+  };
+
+  const addArrayItem = (field: 'qBottlenecks' | 'qResourceAllocation' | 'qEmergingRisks') => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: [...prev[field], '']
+    }));
+  };
+
+  const removeArrayItem = (field: 'qBottlenecks' | 'qResourceAllocation' | 'qEmergingRisks', index: number) => {
+    setFormData(prev => {
+      const newArray = [...prev[field]];
+      newArray.splice(index, 1);
+      return { ...prev, [field]: newArray };
+    });
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       const newPhotos = Array.from(files).map((file: File) => ({
+        name: file.name,
+        url: URL.createObjectURL(file)
+      }));
+      setPhotos(prev => [...prev, ...newPhotos]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files) {
+      const newPhotos = Array.from(files).filter(file => file.type.startsWith('image/')).map((file: File) => ({
         name: file.name,
         url: URL.createObjectURL(file)
       }));
@@ -174,6 +217,24 @@ export default function App() {
 
   const updateTargetObjective = (id: string, field: keyof TargetObjective, value: any) => {
     setTargetObjectives(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
+  };
+
+  const addTargetObjective = () => {
+    if (!newObjectiveText.trim()) return;
+    setTargetObjectives(prev => [...prev, {
+      id: Date.now().toString(),
+      description: newObjectiveText.trim(),
+      completed: false,
+      percentage: 0,
+      startDate: '',
+      endDate: '',
+      duration: ''
+    }]);
+    setNewObjectiveText('');
+  };
+
+  const removeTargetObjective = (id: string) => {
+    setTargetObjectives(prev => prev.filter(t => t.id !== id));
   };
 
   const validateAll = () => {
@@ -440,31 +501,89 @@ export default function App() {
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b pb-2">Predefined Quarter/Annual Target Objectives</label>
                   <div className="space-y-3">
                     {targetObjectives.map(target => (
-                      <div key={target.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50 border border-slate-200 p-3 shadow-sm hover:bg-white transition-colors gap-3">
-                        <div className="flex items-center gap-3">
-                          <input 
-                            type="checkbox" 
-                            checked={target.completed}
-                            onChange={(e) => updateTargetObjective(target.id, 'completed', e.target.checked)}
-                            className="w-5 h-5 accent-emerald-500 rounded border-slate-300 cursor-pointer"
-                          />
-                          <span className={`text-sm ${target.completed ? 'text-slate-400 line-through' : 'text-slate-800 font-medium'}`}>{target.description}</span>
+                      <div key={target.id} className="flex flex-col bg-slate-50 border border-slate-200 p-3 shadow-sm hover:bg-white transition-colors gap-3 relative group/objective">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 pr-6 sm:pr-0">
+                            <input 
+                              type="checkbox" 
+                              checked={target.completed}
+                              onChange={(e) => updateTargetObjective(target.id, 'completed', e.target.checked)}
+                              className="w-5 h-5 accent-emerald-500 rounded border-slate-300 cursor-pointer"
+                            />
+                            <span className={`text-sm ${target.completed ? 'text-slate-400 line-through' : 'text-slate-800 font-medium'}`}>{target.description}</span>
+                          </div>
+                          <div className="flex items-center gap-4 self-end sm:self-auto">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] uppercase font-bold text-slate-500">Completion</span>
+                              <div className="flex items-center bg-white border border-slate-300 px-2 py-1 focus-within:ring-1 focus-within:ring-slate-900 focus-within:border-slate-900 transition-colors">
+                                 <input 
+                                   type="number" 
+                                   min="0" max="100"
+                                   value={target.percentage}
+                                   onChange={(e) => updateTargetObjective(target.id, 'percentage', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                                   className="w-12 text-right bg-transparent text-sm font-mono focus:outline-none text-slate-800"
+                                 />
+                                 <span className="text-sm font-mono text-slate-400 ml-1">%</span>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => removeTargetObjective(target.id)} 
+                              className="top-3 right-3 absolute sm:static sm:top-auto sm:right-auto text-slate-400 hover:text-red-500 transition-colors"
+                              title="Remove objective"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 self-end sm:self-auto">
-                          <span className="text-[10px] uppercase font-bold text-slate-500">Completion</span>
-                          <div className="flex items-center bg-white border border-slate-300 px-2 py-1 focus-within:ring-1 focus-within:ring-slate-900 focus-within:border-slate-900 transition-colors">
-                             <input 
-                               type="number" 
-                               min="0" max="100"
-                               value={target.percentage}
-                               onChange={(e) => updateTargetObjective(target.id, 'percentage', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                               className="w-12 text-right bg-transparent text-sm font-mono focus:outline-none text-slate-800"
-                             />
-                             <span className="text-sm font-mono text-slate-400 ml-1">%</span>
+                        <div className="flex flex-col sm:flex-row gap-4 ml-8 pt-2 border-t border-slate-100">
+                          <div className="flex flex-col gap-1 w-full sm:w-1/3">
+                            <label className="text-[10px] uppercase font-bold text-slate-400">Start Date</label>
+                            <input 
+                              type="date"
+                              value={target.startDate || ''}
+                              onChange={(e) => updateTargetObjective(target.id, 'startDate', e.target.value)}
+                              className="w-full text-sm font-mono bg-transparent border-b border-slate-300 focus:outline-none focus:border-slate-900 p-1"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 w-full sm:w-1/3">
+                            <label className="text-[10px] uppercase font-bold text-slate-400">Duration</label>
+                            <input 
+                              type="text"
+                              value={target.duration || ''}
+                              onChange={(e) => updateTargetObjective(target.id, 'duration', e.target.value)}
+                              placeholder="e.g. 30 days"
+                              className="w-full text-sm font-mono bg-transparent border-b border-slate-300 focus:outline-none focus:border-slate-900 p-1"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 w-full sm:w-1/3">
+                            <label className="text-[10px] uppercase font-bold text-slate-400">End Date</label>
+                            <input 
+                              type="date"
+                              value={target.endDate || ''}
+                              onChange={(e) => updateTargetObjective(target.id, 'endDate', e.target.value)}
+                              className="w-full text-sm font-mono bg-transparent border-b border-slate-300 focus:outline-none focus:border-slate-900 p-1"
+                            />
                           </div>
                         </div>
                       </div>
                     ))}
+                  </div>
+                  <div className="flex gap-2 items-center mt-3 pt-3 border-t border-slate-100">
+                    <input 
+                      type="text"
+                      value={newObjectiveText}
+                      onChange={(e) => setNewObjectiveText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addTargetObjective()}
+                      className="flex-1 border p-2.5 text-sm bg-slate-50 border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white transition-colors"
+                      placeholder="Add a new target objective..."
+                    />
+                    <button 
+                      onClick={addTargetObjective}
+                      disabled={!newObjectiveText.trim()}
+                      className="bg-amber-400 hover:bg-amber-300 text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 text-sm font-bold uppercase transition-colors shadow-sm flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
                   </div>
                 </div>
 
@@ -623,42 +742,78 @@ export default function App() {
                     <span className="font-bold text-slate-500 mr-2">A.</span>
                     What were the primary operational bottlenecks encountered, and how did they impact the critical path?
                   </label>
-                  <textarea
-                    name="qBottlenecks"
-                    value={formData.qBottlenecks}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full border p-4 text-sm bg-slate-50 border-slate-300 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 focus:bg-white text-slate-900 resize-y transition-colors leading-relaxed placeholder:text-slate-400"
-                    placeholder="Manager's critical assessment..."
-                  />
+                  <div className="space-y-2 pl-6">
+                    {formData.qBottlenecks.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2 group">
+                         <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></div>
+                         <input
+                           type="text"
+                           value={item}
+                           onChange={(e) => handleArrayInputChange('qBottlenecks', idx, e.target.value)}
+                           placeholder="Enter bottleneck point..."
+                           className="flex-1 border-b border-slate-200 hover:border-slate-300 focus:border-slate-900 focus:outline-none py-1.5 text-sm bg-transparent transition-colors placeholder:text-slate-300"
+                         />
+                         <button onClick={() => removeArrayItem('qBottlenecks', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Remove point">
+                           <Trash2 className="w-4 h-4" />
+                         </button>
+                      </div>
+                    ))}
+                    <button onClick={() => addArrayItem('qBottlenecks')} className="text-[11px] font-bold text-slate-500 hover:text-slate-800 uppercase tracking-wider flex items-center gap-1 mt-3 transition-colors">
+                       <Plus className="w-3 h-3" /> Add Point
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <label className="block text-[13px] font-medium text-slate-700 leading-tight">
                     <span className="font-bold text-slate-500 mr-2">B.</span>
                     Detail resource allocation efficiency. Were there any shortages or supply chain disruptions?
                   </label>
-                  <textarea
-                    name="qResourceAllocation"
-                    value={formData.qResourceAllocation}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full border p-4 text-sm bg-slate-50 border-slate-300 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 focus:bg-white text-slate-900 resize-y transition-colors leading-relaxed placeholder:text-slate-400"
-                    placeholder="e.g. Unavailability of specialized 316L stainless piping..."
-                  />
+                  <div className="space-y-2 pl-6">
+                    {formData.qResourceAllocation.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2 group">
+                         <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></div>
+                         <input
+                           type="text"
+                           value={item}
+                           onChange={(e) => handleArrayInputChange('qResourceAllocation', idx, e.target.value)}
+                           placeholder="Enter resource allocation note..."
+                           className="flex-1 border-b border-slate-200 hover:border-slate-300 focus:border-slate-900 focus:outline-none py-1.5 text-sm bg-transparent transition-colors placeholder:text-slate-300"
+                         />
+                         <button onClick={() => removeArrayItem('qResourceAllocation', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Remove point">
+                           <Trash2 className="w-4 h-4" />
+                         </button>
+                      </div>
+                    ))}
+                    <button onClick={() => addArrayItem('qResourceAllocation')} className="text-[11px] font-bold text-slate-500 hover:text-slate-800 uppercase tracking-wider flex items-center gap-1 mt-3 transition-colors">
+                       <Plus className="w-3 h-3" /> Add Point
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <label className="block text-[13px] font-medium text-slate-700 leading-tight">
                     <span className="font-bold text-slate-500 mr-2">C.</span>
                     Are there any emerging risks? Explain mitigation strategies.
                   </label>
-                  <textarea
-                    name="qEmergingRisks"
-                    value={formData.qEmergingRisks}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full border p-4 text-sm bg-slate-50 border-slate-300 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 focus:bg-white text-slate-900 resize-y transition-colors leading-relaxed placeholder:text-slate-400"
-                    placeholder="e.g. Upcoming monsoon season poses a risk to earthworks..."
-                  />
+                  <div className="space-y-2 pl-6">
+                    {formData.qEmergingRisks.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2 group">
+                         <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></div>
+                         <input
+                           type="text"
+                           value={item}
+                           onChange={(e) => handleArrayInputChange('qEmergingRisks', idx, e.target.value)}
+                           placeholder="Enter perceived risk and mitigation..."
+                           className="flex-1 border-b border-slate-200 hover:border-slate-300 focus:border-slate-900 focus:outline-none py-1.5 text-sm bg-transparent transition-colors placeholder:text-slate-300"
+                         />
+                         <button onClick={() => removeArrayItem('qEmergingRisks', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Remove point">
+                           <Trash2 className="w-4 h-4" />
+                         </button>
+                      </div>
+                    ))}
+                    <button onClick={() => addArrayItem('qEmergingRisks')} className="text-[11px] font-bold text-slate-500 hover:text-slate-800 uppercase tracking-wider flex items-center gap-1 mt-3 transition-colors">
+                       <Plus className="w-3 h-3" /> Add Point
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -672,7 +827,11 @@ export default function App() {
                  </h2>
               </div>
               <div className="p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-4">
+                <div 
+                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-4"
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                >
                   {photos.map((photo, idx) => (
                     <div key={idx} className="aspect-square bg-slate-100 flex flex-col items-center justify-center border border-slate-200 relative overflow-hidden group shadow-sm">
                       <img src={photo.url} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
@@ -690,7 +849,7 @@ export default function App() {
                   >
                     <div className="text-center p-2 flex flex-col items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center"><ImageIcon className="w-5 h-5 text-slate-500" /></div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Add Photo</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Add Photos<br/><span className="text-[9px] font-normal opacity-70">(Click or Drop)</span></span>
                     </div>
                   </div>
                 </div>
@@ -702,7 +861,7 @@ export default function App() {
                   className="hidden" 
                   onChange={handlePhotoUpload} 
                 />
-                <p className="text-[11px] text-slate-500 italic p-3 bg-slate-50 border border-slate-100 inline-block">Attach site condition photos, incident visual data, or achievement proof. Approved formats: JPG, PNG, WEBP.</p>
+                <p className="text-[11px] text-slate-500 italic p-3 bg-slate-50 border border-slate-100 inline-block">Attach multiple site condition photos, incident visual data, or achievement proof. Approved formats: JPG, PNG, WEBP.</p>
               </div>
             </div>
               
